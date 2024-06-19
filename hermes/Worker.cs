@@ -13,32 +13,41 @@ public class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-        
-        var configurationOptions = new ConfigurationOptions
+        try
         {
-            EndPoints =
-            {
-                "localhost:6379"
-            }
-        };
-        
-        var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(configurationOptions);
-        var subscriber = connectionMultiplexer.GetSubscriber();
-        
-        await subscriber.SubscribeAsync("__keyspace@0__:*", (channel, type) =>
-        {
-            var key = GetKey(channel);
+            _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
-            switch (type)
+            var configurationOptions = new ConfigurationOptions
             {
-                case "expired":
-                    Console.WriteLine($"SEND TO TR KEY: {key}");
-                    break;
-            }
-        });
+                EndPoints =
+                {
+                    "localhost:6379"
+                },
+                AbortOnConnectFail = false,
+                ReconnectRetryPolicy = new ExponentialRetry(5000, 10000)
+            };
+
+            var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(configurationOptions);
+            var subscriber = connectionMultiplexer.GetSubscriber();
+
+            await subscriber.SubscribeAsync("__keyspace@0__:*", (channel, type) =>
+            {
+                var key = GetKey(channel);
+
+                switch (type)
+                {
+                    case "expired":
+                        Console.WriteLine($"SEND TO TR KEY: {key}");
+                        break;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex.Message);
+        }
     }
-    
+
     private static string GetKey(string channel)
     {
         var index = channel.IndexOf(':');

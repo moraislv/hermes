@@ -1,6 +1,14 @@
+version: "3.9"
+
 services:
   redis:
-    image: redis
-    command: redis-server
+    image: "redis"
     ports:
       - "6379:6379"
+    volumes:
+    - ./data/redis-data:/data
+    command: sh -cx "redis-server --daemonize yes && redis-cli config set notify-keyspace-events Kx && sleep infinity"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
